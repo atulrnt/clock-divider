@@ -37,6 +37,8 @@ unsigned long lastClock = 0;
 unsigned long lastClockCheck = 0;
 unsigned long lastTempos = 1200;
 
+boolean currentClockState = false;
+boolean lastClockState = false;
 boolean isResetActive = false;
 boolean isClockActive = false;
 byte externalClockCount = 0;
@@ -76,18 +78,21 @@ void loop() {
   durationPot.update();
   tempoPot.update();
 
-  if (isExternallyClocked()) {
-    checkClockInput();
+  currentClockState = isExternallyClocked();
+
+  if (!lastClockState && currentClockState) {
+    clockStep = 0;
+  }
+
+  lastClockState = currentClockState;
+
+  if (currentClockState) {
+    checkClockInput(); 
   } else {
     checkTempoPot();
   }
 
-//  lastTempos -= round(lastTempos/10);
-//  lastTempos += tempo;
-//  tempo = round(lastTempos/10);
-
   checkReset();
-
   checkProbabilityPot();
   checkTriggerDuration();
   
@@ -107,12 +112,11 @@ void loop() {
   }
   
   display.show(10);
+  delay(1);
 }
 
-void checkTempoPot() {    
-  if (tempoPot.hasChanged()) {    
+void checkTempoPot() {   
     tempo = map(tempoPot.getValue(), 0, 1023, tempoRange[0], tempoRange[1]);
-  }
 }
 
 void checkProbabilityPot() {
@@ -152,8 +156,6 @@ int getTriggerDuration() {
   float duration = triggerDuration * 0.01;
   return round((60000 / tempo) * duration);
 }
-
-
 
 void triggerOutput() {
   skippedDividers = 0;
@@ -205,9 +207,13 @@ void triggerOutput() {
 
 void checkClockInput() {
   if (digitalRead(CLOCK) == LOW && !isClockActive) {
+    tempo = round(60000 / (currentTime - lastClock));
+    lastTempos -= round(lastTempos / 10);
+    lastTempos += tempo;
+    tempo = round(lastTempos / 10);
+    
     isClockActive = true;
     lastClock = currentTime;
-    tempo = round(60000 / (currentTime - lastClock));
   }
 
   if (digitalRead(CLOCK) == HIGH && isClockActive) {
